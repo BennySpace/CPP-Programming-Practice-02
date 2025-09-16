@@ -13,7 +13,7 @@ public:
 
     Cashier(int cashier_id);
 
-    void process(Client client, DoublyLinkedList& queue, std::mutex& queue_mutex);
+    void process(const Client& client, DoublyLinkedList& queue, std::mutex& queue_mutex);
 };
 
 #endif // CASHIER_H

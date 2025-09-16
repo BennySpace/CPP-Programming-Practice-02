@@ -6,7 +6,7 @@
 
 Cashier::Cashier(int cashier_id) : id(cashier_id), cancel_flag(false), stop_flag(false) {}
 
-void Cashier::process(Client client, DoublyLinkedList& queue, std::mutex& queue_mutex) {
+void Cashier::process(const Client& client, DoublyLinkedList& queue, std::mutex& queue_mutex) {
     std::cout << "Cashier " << id << " starting to serve client " << client.id << " with " << client.items << " items." << std::endl;
 
     std::random_device rd;
