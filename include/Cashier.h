@@ -1,5 +1,5 @@
-#ifndef SHOPQUEUE_CASHIER_H
-#define SHOPQUEUE_CASHIER_H
+#ifndef CASHIER_H
+#define CASHIER_H
 
 #include "DoublyLinkedList.h"
 #include <atomic>
@@ -16,5 +16,4 @@ public:
     void process(Client client, DoublyLinkedList& queue, std::mutex& queue_mutex);
 };
 
-
-#endif //SHOPQUEUE_CASHIER_H
+#endif // CASHIER_H

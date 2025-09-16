@@ -1,5 +1,5 @@
-#ifndef SHOPQUEUE_DOUBLY_LINKED_LIST_H
-#define SHOPQUEUE_DOUBLY_LINKED_LIST_H
+#ifndef DOUBLY_LINKED_LIST_H
+#define DOUBLY_LINKED_LIST_H
 
 #include "Client.h"
 #include <stdexcept>
@@ -27,4 +27,4 @@ public:
     size_t size() const;
 };
 
-#endif // SHOPQUEUE_DOUBLY_LINKED_LIST_H
+#endif // DOUBLY_LINKED_LIST_H

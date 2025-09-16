@@ -1,5 +1,5 @@
-#ifndef SHOPQUEUE_CLIENT_H
-#define SHOPQUEUE_CLIENT_H
+#ifndef CLIENT_H
+#define CLIENT_H
 
 class Client {
 public:
@@ -9,4 +9,4 @@ public:
     Client(int client_id, int num_items);
 };
 
-#endif // SHOPQUEUE_CLIENT_H
+#endif // CLIENT_H
