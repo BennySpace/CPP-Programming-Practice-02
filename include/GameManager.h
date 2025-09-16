@@ -1,14 +1,15 @@
-#ifndef SHOPQUEUE_GAMEMANAGER_H
-#define SHOPQUEUE_GAMEMANAGER_H
+#ifndef GAME_MANAGER_H
+#define GAME_MANAGER_H
 
+#include "Client.h"
 #include "DoublyLinkedList.h"
 #include "Cashier.h"
-#include <atomic>
-#include <memory>
-#include <mutex>
-#include <random>
-#include <thread>
 #include <vector>
+#include <memory>
+#include <thread>
+#include <mutex>
+#include <atomic>
+#include <random>
 
 class GameManager {
 public:
@@ -21,17 +22,17 @@ private:
     int num_cashiers;
     DoublyLinkedList queue;
     std::mutex queue_mutex;
-    std::atomic<bool> served;
-    std::atomic<bool> total_clients;
+    std::atomic<int> served;
+    std::atomic<int> total_clients;
     std::vector<std::shared_ptr<Cashier>> cashiers;
     std::vector<std::thread> threads;
     std::mt19937 gen;
 
-    void cashier_thread(std::shared_ptr<Cashier> cashier, int total_clients_val);
+    void cashier_thread(std::shared_ptr<Cashier> cashier);
     void handle_command(const std::string& line);
     void initialize_clients();
     void initialize_cashiers();
     int get_input_int(const std::string& prompt, int min_val, int max_val);
 };
 
-#endif //SHOPQUEUE_GAMEMANAGER_H
+#endif // GAME_MANAGER_H
