@@ -11,19 +11,23 @@ void cashier_thread_func(std::shared_ptr<Cashier> cashier, DoublyLinkedList& que
             break;
         }
 
-        Client c = queue.pop_front();
+        Client client{0, 0};
+        bool has_client = false;
 
         {
             std::lock_guard<std::mutex> lock(queue_mutex);
 
-            if (queue.empty()) {
-                break;
+            if (!queue.empty()) {
+                client = queue.pop_front();
+                has_client = true;
             }
-
-            c = queue.pop_front();
         }
 
-        cashier->process(c, queue, queue_mutex);
+        if (!has_client) {
+            break;
+        }
+
+        cashier->process(client, queue, queue_mutex);
 
         if (!cashier->cancel_flag.load()) {
             served.fetch_add(1);
