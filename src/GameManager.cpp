@@ -82,13 +82,14 @@ void GameManager::run() {
 
     while (served.load() < total_clients.load()) {
         std::string line;
-        std::getline(std::cin, line);
 
-        if (line.empty()) {
-            continue;
+        if (std::getline(std::cin, line)) {
+            if (!line.empty()) {
+                handle_command(line);
+            }
         }
 
-        handle_command(line);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
     std::cout << "All clients served. Game over." << std::endl;
