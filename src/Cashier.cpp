@@ -11,7 +11,7 @@ void Cashier::process(const Client& client, DoublyLinkedList& queue, std::mutex&
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> dist_delay(1, 3);
+    std::uniform_int_distribution<int> dist_delay(3, 6);
     int delay_sec = dist_delay(gen);
     int total_ms = delay_sec * 1000;
     int step_ms = 100;
