@@ -3,41 +3,37 @@
 #include <string>
 #include <sstream>
 #include <limits>
+#include <chrono>
+#include <thread>
 
 void cashier_thread_func(std::shared_ptr<Cashier> cashier, DoublyLinkedList& queue, std::mutex& queue_mutex, std::atomic<int>& served) {
-    while (true) {
-        if (cashier->stop_flag.load()) {
-            std::cout << "Cashier " << cashier->id << " is stopping." << std::endl;
-            break;
-        }
-
-        Client client{0, 0};
+    while (!cashier->stop_flag.load()) {
+        Client c{0, 0};
         bool has_client = false;
 
         {
             std::lock_guard<std::mutex> lock(queue_mutex);
 
             if (!queue.empty()) {
-                client = queue.pop_front();
+                c = queue.pop_front();
                 has_client = true;
             }
         }
 
         if (!has_client) {
+            std::cout << "Cashier " << cashier->id << " found empty queue, exiting." << std::endl;
             break;
         }
 
-        cashier->process(client, queue, queue_mutex);
+        cashier->process(c, queue, queue_mutex);
 
-        if (!cashier->cancel_flag.load()) {
+        if (!cashier->cancel_flag.load() && !cashier->stop_flag.load()) {
             served.fetch_add(1);
-        }
-
-        if (cashier->stop_flag.load()) {
-            std::cout << "Cashier " << cashier->id << " is stopping after current client." << std::endl;
-            break;
+            std::cout << "Cashier " << cashier->id << " incremented served to " << served.load() << std::endl;
         }
     }
+
+    std::cout << "Cashier " << cashier->id << " has stopped." << std::endl;
 }
 
 GameManager::GameManager() : served(0), total_clients(0), gen(std::random_device{}()) {
@@ -46,19 +42,23 @@ GameManager::GameManager() : served(0), total_clients(0), gen(std::random_device
     std::uniform_int_distribution<int> dist_items(1, 15);
 
     num_clients = get_input_int("Enter number of clients (5-15) or 0 for random: ", 0, 15);
+
     if (num_clients == 0) {
         num_clients = dist_clients(gen);
     } else if (num_clients < 5) {
         num_clients = 5;
     }
+
     std::cout << "Number of clients: " << num_clients << std::endl;
 
     num_cashiers = get_input_int("Enter number of cashiers (1-5) or 0 for random: ", 0, 5);
+
     if (num_cashiers == 0) {
         num_cashiers = dist_cashiers(gen);
     } else if (num_cashiers < 1) {
         num_cashiers = 1;
     }
+
     std::cout << "Number of cashiers: " << num_cashiers << std::endl;
 
     initialize_clients();
@@ -66,6 +66,10 @@ GameManager::GameManager() : served(0), total_clients(0), gen(std::random_device
 }
 
 GameManager::~GameManager() {
+    for (auto& cashier : cashiers) {
+        cashier->stop_flag.store(true);
+    }
+
     for (auto& t : threads) {
         if (t.joinable()) {
             t.join();
@@ -79,17 +83,30 @@ void GameManager::run() {
     }
 
     std::cout << "Game started. Commands: 'marina' (add cashier), 'galya <id>' (cancel), 'newclient' (add client), 'close <id>' (stop cashier)" << std::endl;
+    while (served.load() < total_clients.load() || !queue.empty()) {
+        std::cin.clear();
 
-    while (served.load() < total_clients.load()) {
-        std::string line;
+        if (std::cin.rdbuf()->in_avail() > 0) {
+            std::string line;
 
-        if (std::getline(std::cin, line)) {
-            if (!line.empty()) {
-                handle_command(line);
+            if (std::getline(std::cin, line)) {
+                if (!line.empty()) {
+                    handle_command(line);
+                }
             }
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
+
+    for (auto& cashier : cashiers) {
+        cashier->stop_flag.store(true);
+    }
+
+    for (auto& t : threads) {
+        if (t.joinable()) {
+            t.join();
+        }
     }
 
     std::cout << "All clients served. Game over." << std::endl;
