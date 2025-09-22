@@ -82,7 +82,7 @@ void GameManager::run() {
         threads.emplace_back(cashier_thread_func, cashier, std::ref(queue), std::ref(queue_mutex), std::ref(served));
     }
 
-    std::cout << "Game started. Commands: 'marina' (add cashier), 'galya <id>' (cancel), 'newclient' (add client), 'close <id>' (stop cashier)" << std::endl;
+    std::cout << "Game started. Commands: 'marina' (add cashier), 'galya <id>' (cancel), 'add' (add client), 'obed <id>' (stop cashier)" << std::endl;
     while (served.load() < total_clients.load() || !queue.empty()) {
         std::cin.clear();
 
@@ -170,7 +170,7 @@ void GameManager::handle_command(const std::string& line) {
                 }
             }
         }
-    } else if (command == "newclient") {
+    } else if (command == "add") {
         int new_id = total_clients.fetch_add(1) + 1;
         int items = dist_items(gen);
 
@@ -180,7 +180,7 @@ void GameManager::handle_command(const std::string& line) {
         }
 
         std::cout << "Added new client " << new_id << " to the queue." << std::endl;
-    } else if (command == "close") {
+    } else if (command == "obed") {
         int cashier_id;
 
         if (iss >> cashier_id) {
