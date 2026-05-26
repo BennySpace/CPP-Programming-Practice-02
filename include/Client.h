@@ -3,10 +3,14 @@
 
 class Client {
 public:
+    Client(int client_id, int num_items);
+
+    int get_id() const;
+    int get_items() const;
+
+private:
     int id;
     int items;
-
-    Client(int client_id, int num_items);
 };
 
 #endif // CLIENT_H

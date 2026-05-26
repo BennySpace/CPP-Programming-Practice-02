@@ -1,4 +1,5 @@
 #include "GameManager.h"
+#include "ConsoleUtils.h"
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -7,7 +8,7 @@
 #include <thread>
 
 void cashier_thread_func(std::shared_ptr<Cashier> cashier, DoublyLinkedList& queue, std::mutex& queue_mutex, std::atomic<int>& served) {
-    while (!cashier->stop_flag.load()) {
+    while (!cashier->is_stop_requested()) {
         Client c{0, 0};
         bool has_client = false;
 
@@ -21,19 +22,20 @@ void cashier_thread_func(std::shared_ptr<Cashier> cashier, DoublyLinkedList& que
         }
 
         if (!has_client) {
-            std::cout << "Cashier " << cashier->id << " found empty queue, exiting." << std::endl;
-            break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
         }
 
-        cashier->process(c, queue, queue_mutex);
+        Cashier::ProcessResult result = cashier->process(c, queue, queue_mutex);
 
-        if (!cashier->cancel_flag.load() && !cashier->stop_flag.load()) {
+        if (result == Cashier::ProcessResult::Completed) {
             served.fetch_add(1);
-            std::cout << "Cashier " << cashier->id << " incremented served to " << served.load() << std::endl;
+            log_line("Cashier " + std::to_string(cashier->get_id()) + " incremented served to " +
+                     std::to_string(served.load()));
         }
     }
 
-    std::cout << "Cashier " << cashier->id << " has stopped." << std::endl;
+    log_line("Cashier " + std::to_string(cashier->get_id()) + " has stopped.");
 }
 
 GameManager::GameManager() : served(0), total_clients(0), gen(std::random_device{}()) {
@@ -49,7 +51,7 @@ GameManager::GameManager() : served(0), total_clients(0), gen(std::random_device
         num_clients = 5;
     }
 
-    std::cout << "Number of clients: " << num_clients << std::endl;
+    log_line("Number of clients: " + std::to_string(num_clients));
 
     num_cashiers = get_input_int("Enter number of cashiers (1-5) or 0 for random: ", 0, 5);
 
@@ -59,7 +61,7 @@ GameManager::GameManager() : served(0), total_clients(0), gen(std::random_device
         num_cashiers = 1;
     }
 
-    std::cout << "Number of cashiers: " << num_cashiers << std::endl;
+    log_line("Number of cashiers: " + std::to_string(num_cashiers));
 
     initialize_clients();
     initialize_cashiers();
@@ -67,7 +69,7 @@ GameManager::GameManager() : served(0), total_clients(0), gen(std::random_device
 
 GameManager::~GameManager() {
     for (auto& cashier : cashiers) {
-        cashier->stop_flag.store(true);
+        cashier->request_stop();
     }
 
     for (auto& t : threads) {
@@ -82,17 +84,31 @@ void GameManager::run() {
         threads.emplace_back(cashier_thread_func, cashier, std::ref(queue), std::ref(queue_mutex), std::ref(served));
     }
 
-    std::cout << "Game started. Commands: 'marina' (add cashier), 'galya <id>' (cancel), 'add' (add client), 'obed <id>' (stop cashier)" << std::endl;
-    while (served.load() < total_clients.load() || !queue.empty()) {
+    log_line("Game started. Commands: 'marina' (add cashier), 'galya <id>' (cancel), 'add' (add client), 'obed <id>' (stop cashier)");
+    while (true) {
+        bool queue_empty = false;
+
+        {
+            std::lock_guard<std::mutex> lock(queue_mutex);
+            queue_empty = queue.empty();
+        }
+
+        if (served.load() >= total_clients.load() && queue_empty) {
+            break;
+        }
+
+        if (!queue_empty && count_active_cashiers() == 0) {
+            log_line("No active cashiers left. Game cannot continue.");
+            break;
+        }
+
         std::cin.clear();
 
         if (std::cin.rdbuf()->in_avail() > 0) {
             std::string line;
 
-            if (std::getline(std::cin, line)) {
-                if (!line.empty()) {
-                    handle_command(line);
-                }
+            if (std::getline(std::cin, line) && !line.empty()) {
+                handle_command(line);
             }
         }
 
@@ -100,7 +116,7 @@ void GameManager::run() {
     }
 
     for (auto& cashier : cashiers) {
-        cashier->stop_flag.store(true);
+        cashier->request_stop();
     }
 
     for (auto& t : threads) {
@@ -109,7 +125,7 @@ void GameManager::run() {
         }
     }
 
-    std::cout << "All clients served. Game over." << std::endl;
+    log_line("All clients served. Game over.");
 }
 
 int GameManager::get_input_int(const std::string& prompt, int min_val, int max_val) {
@@ -156,19 +172,27 @@ void GameManager::handle_command(const std::string& line) {
         auto new_cashier = std::make_shared<Cashier>(new_id);
         cashiers.push_back(new_cashier);
         threads.emplace_back(cashier_thread_func, new_cashier, std::ref(queue), std::ref(queue_mutex), std::ref(served));
-        std::cout << "Added new cashier " << new_id << "." << std::endl;
+        log_line("Added new cashier " + std::to_string(new_id) + ".");
     } else if (command == "galya") {
         int cashier_id;
+        bool found = false;
 
         if (iss >> cashier_id) {
             for (auto& cashier : cashiers) {
-                if (cashier->id == cashier_id) {
-                    cashier->cancel_flag.store(true);
-                    std::cout << "Cancel command sent to cashier " << cashier_id << "." << std::endl;
+                if (cashier->get_id() == cashier_id) {
+                    found = true;
+                    cashier->request_cancel();
+                    log_line("Cancel command sent to cashier " + std::to_string(cashier_id) + ".");
 
                     break;
                 }
             }
+
+            if (!found) {
+                log_line("Cashier " + std::to_string(cashier_id) + " not found.");
+            }
+        } else {
+            log_line("Usage: galya <id>");
         }
     } else if (command == "add") {
         int new_id = total_clients.fetch_add(1) + 1;
@@ -179,19 +203,47 @@ void GameManager::handle_command(const std::string& line) {
             queue.push_back(Client(new_id, items));
         }
 
-        std::cout << "Added new client " << new_id << " to the queue." << std::endl;
+        log_line("Added new client " + std::to_string(new_id) + " to the queue.");
     } else if (command == "obed") {
         int cashier_id;
+        bool found = false;
 
         if (iss >> cashier_id) {
             for (auto& cashier : cashiers) {
-                if (cashier->id == cashier_id) {
-                    cashier->stop_flag.store(true);
-                    std::cout << "Stop command sent to cashier " << cashier_id << "." << std::endl;
+                if (cashier->get_id() == cashier_id) {
+                    found = true;
+                    if (count_active_cashiers() <= 1) {
+                        log_line("Cannot stop cashier " + std::to_string(cashier_id) +
+                                 " because it is the last active cashier.");
+                        break;
+                    }
+
+                    cashier->request_stop();
+                    log_line("Stop command sent to cashier " + std::to_string(cashier_id) + ".");
 
                     break;
                 }
             }
+
+            if (!found) {
+                log_line("Cashier " + std::to_string(cashier_id) + " not found.");
+            }
+        } else {
+            log_line("Usage: obed <id>");
+        }
+    } else if (!command.empty()) {
+        log_line("Unknown command.");
+    }
+}
+
+size_t GameManager::count_active_cashiers() const {
+    size_t active_cashiers = 0;
+
+    for (const auto& cashier : cashiers) {
+        if (!cashier->is_stop_requested()) {
+            ++active_cashiers;
         }
     }
+
+    return active_cashiers;
 }

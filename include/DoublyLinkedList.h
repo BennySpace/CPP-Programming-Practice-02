@@ -19,6 +19,10 @@ class DoublyLinkedList {
 public:
     DoublyLinkedList();
     ~DoublyLinkedList();
+    DoublyLinkedList(const DoublyLinkedList&) = delete;
+    DoublyLinkedList& operator=(const DoublyLinkedList&) = delete;
+    DoublyLinkedList(DoublyLinkedList&&) = delete;
+    DoublyLinkedList& operator=(DoublyLinkedList&&) = delete;
 
     void push_back(const Client& c);
     void push_front(const Client& c);

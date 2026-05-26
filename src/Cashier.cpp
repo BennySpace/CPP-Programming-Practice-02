@@ -1,50 +1,77 @@
 #include "Cashier.h"
-#include <iostream>
-#include <thread>
+#include "ConsoleUtils.h"
+#include <algorithm>
 #include <chrono>
 #include <random>
+#include <string>
+#include <thread>
 
 Cashier::Cashier(int cashier_id) : id(cashier_id), cancel_flag(false), stop_flag(false) {}
 
-void Cashier::process(const Client& c, DoublyLinkedList& queue, std::mutex& queue_mutex) {
-    std::cout << "Cashier " << id << " starting to serve client " << c.id << " with " << c.items << " items." << std::endl;
+int Cashier::get_id() const {
+    return id;
+}
+
+bool Cashier::is_cancel_requested() const {
+    return cancel_flag.load();
+}
+
+bool Cashier::is_stop_requested() const {
+    return stop_flag.load();
+}
+
+void Cashier::request_cancel() {
+    cancel_flag.store(true);
+}
+
+void Cashier::clear_cancel() {
+    cancel_flag.store(false);
+}
+
+void Cashier::request_stop() {
+    stop_flag.store(true);
+}
+
+Cashier::ProcessResult Cashier::process(const Client& client, DoublyLinkedList& queue, std::mutex& queue_mutex) {
+    log_line("Cashier " + std::to_string(id) + " starting to serve client " +
+             std::to_string(client.get_id()) + " with " + std::to_string(client.get_items()) + " items.");
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> dist_delay(3, 6); // 3–6 seconds for interactivity
-    int delay_sec = dist_delay(gen);
+    std::uniform_int_distribution<int> dist_extra_delay(0, 2);
+    int delay_sec = std::min(6, 1 + (client.get_items() / 4) + dist_extra_delay(gen));
     int total_ms = delay_sec * 1000;
     int step_ms = 100;
 
     for (int elapsed = 0; elapsed < total_ms; elapsed += step_ms) {
         std::this_thread::sleep_for(std::chrono::milliseconds(step_ms));
 
-        if (cancel_flag.load()) {
-            std::cout << "Cancel triggered on cashier " << id << " for client " << c.id << ". Putting back to queue." << std::endl;
+        if (is_cancel_requested()) {
+            log_line("Cancel triggered on cashier " + std::to_string(id) + " for client " +
+                     std::to_string(client.get_id()) + ". Putting back to queue.");
 
             {
                 std::lock_guard<std::mutex> lock(queue_mutex);
-                queue.push_front(c);
+                queue.push_front(client);
             }
 
-            cancel_flag.store(false);
-
-            return;
+            clear_cancel();
+            return ProcessResult::Cancelled;
         }
 
-        if (stop_flag.load()) {
-            std::cout << "Stop triggered on cashier " << id << " for client " << c.id << ". Putting back to queue." << std::endl;
+        if (is_stop_requested()) {
+            log_line("Stop triggered on cashier " + std::to_string(id) + " for client " +
+                     std::to_string(client.get_id()) + ". Putting back to queue.");
 
             {
                 std::lock_guard<std::mutex> lock(queue_mutex);
-                queue.push_front(c);
+                queue.push_front(client);
             }
 
-            cancel_flag.store(false);
-
-            return;
+            return ProcessResult::Stopped;
         }
     }
 
-    std::cout << "Cashier " << id << " finished serving client " << c.id << "." << std::endl;
+    log_line("Cashier " + std::to_string(id) + " finished serving client " + std::to_string(client.get_id()) + ".");
+    return ProcessResult::Completed;
 }

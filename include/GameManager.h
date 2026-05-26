@@ -10,6 +10,7 @@
 #include <mutex>
 #include <atomic>
 #include <random>
+#include <cstddef>
 
 class GameManager {
 public:
@@ -28,11 +29,11 @@ private:
     std::vector<std::thread> threads;
     std::mt19937 gen;
 
-    void cashier_thread(std::shared_ptr<Cashier> cashier);
     void handle_command(const std::string& line);
     void initialize_clients();
     void initialize_cashiers();
     int get_input_int(const std::string& prompt, int min_val, int max_val);
+    size_t count_active_cashiers() const;
 };
 
 #endif // GAME_MANAGER_H
