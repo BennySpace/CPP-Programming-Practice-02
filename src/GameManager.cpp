@@ -7,6 +7,27 @@
 #include <chrono>
 #include <thread>
 
+#ifdef _WIN32
+#define NOMINMAX
+#include <conio.h>
+#include <windows.h>
+#endif
+
+namespace {
+bool has_pending_command() {
+#ifdef _WIN32
+    DWORD console_mode = 0;
+    HANDLE input_handle = GetStdHandle(STD_INPUT_HANDLE);
+
+    if (input_handle != INVALID_HANDLE_VALUE && GetConsoleMode(input_handle, &console_mode)) {
+        return _kbhit() != 0;
+    }
+#endif
+
+    return std::cin.rdbuf()->in_avail() > 0;
+}
+}
+
 void cashier_thread_func(std::shared_ptr<Cashier> cashier, DoublyLinkedList& queue, std::mutex& queue_mutex, std::atomic<int>& served) {
     while (!cashier->is_stop_requested()) {
         Client c{0, 0};
@@ -102,9 +123,7 @@ void GameManager::run() {
             break;
         }
 
-        std::cin.clear();
-
-        if (std::cin.rdbuf()->in_avail() > 0) {
+        if (has_pending_command()) {
             std::string line;
 
             if (std::getline(std::cin, line) && !line.empty()) {
