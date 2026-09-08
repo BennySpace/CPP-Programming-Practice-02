@@ -183,7 +183,12 @@ void GameManager::handle_command(const std::string& line) {
     std::uniform_int_distribution<int> dist_items(1, 15);
 
     if (command == "marina") {
-        int new_id = cashiers.size() + 1;
+        if (cashiers.size() >= static_cast<size_t>(std::numeric_limits<int>::max())) {
+            log_line("Cannot add a cashier because the ID range is exhausted.");
+            return;
+        }
+
+        int new_id = static_cast<int>(cashiers.size() + 1);
         auto new_cashier = std::make_shared<Cashier>(new_id);
         cashiers.push_back(new_cashier);
         threads.emplace_back(cashier_thread_func, new_cashier, std::ref(queue), std::ref(queue_mutex), std::ref(served));
