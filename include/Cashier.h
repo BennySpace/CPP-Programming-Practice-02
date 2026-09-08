@@ -16,17 +16,21 @@ public:
     Cashier(int cashier_id);
 
     int get_id() const;
-    bool is_cancel_requested() const;
     bool is_stop_requested() const;
-    void request_cancel();
-    void clear_cancel();
+    bool request_cancel();
     void request_stop();
 
     ProcessResult process(const Client& client, DoublyLinkedList& queue, std::mutex& queue_mutex);
 
 private:
+    enum class ServiceState {
+        Idle,
+        Serving,
+        CancelRequested
+    };
+
     int id;
-    std::atomic<bool> cancel_flag;
+    std::atomic<ServiceState> service_state;
     std::atomic<bool> stop_flag;
 };
 

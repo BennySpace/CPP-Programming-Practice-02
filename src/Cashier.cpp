@@ -6,26 +6,19 @@
 #include <string>
 #include <thread>
 
-Cashier::Cashier(int cashier_id) : id(cashier_id), cancel_flag(false), stop_flag(false) {}
+Cashier::Cashier(int cashier_id) : id(cashier_id), service_state(ServiceState::Idle), stop_flag(false) {}
 
 int Cashier::get_id() const {
     return id;
-}
-
-bool Cashier::is_cancel_requested() const {
-    return cancel_flag.load();
 }
 
 bool Cashier::is_stop_requested() const {
     return stop_flag.load();
 }
 
-void Cashier::request_cancel() {
-    cancel_flag.store(true);
-}
-
-void Cashier::clear_cancel() {
-    cancel_flag.store(false);
+bool Cashier::request_cancel() {
+    ServiceState expected = ServiceState::Serving;
+    return service_state.compare_exchange_strong(expected, ServiceState::CancelRequested);
 }
 
 void Cashier::request_stop() {
@@ -33,6 +26,8 @@ void Cashier::request_stop() {
 }
 
 Cashier::ProcessResult Cashier::process(const Client& client, DoublyLinkedList& queue, std::mutex& queue_mutex) {
+    service_state.store(ServiceState::Serving);
+
     log_line("Cashier " + std::to_string(id) + " starting to serve client " +
              std::to_string(client.get_id()) + " with " + std::to_string(client.get_items()) + " items.");
 
@@ -46,7 +41,7 @@ Cashier::ProcessResult Cashier::process(const Client& client, DoublyLinkedList& 
     for (int elapsed = 0; elapsed < total_ms; elapsed += step_ms) {
         std::this_thread::sleep_for(std::chrono::milliseconds(step_ms));
 
-        if (is_cancel_requested()) {
+        if (service_state.load() == ServiceState::CancelRequested) {
             log_line("Cancel triggered on cashier " + std::to_string(id) + " for client " +
                      std::to_string(client.get_id()) + ". Putting back to queue.");
 
@@ -55,7 +50,7 @@ Cashier::ProcessResult Cashier::process(const Client& client, DoublyLinkedList& 
                 queue.push_front(client);
             }
 
-            clear_cancel();
+            service_state.store(ServiceState::Idle);
             return ProcessResult::Cancelled;
         }
 
@@ -68,8 +63,21 @@ Cashier::ProcessResult Cashier::process(const Client& client, DoublyLinkedList& 
                 queue.push_front(client);
             }
 
+            service_state.store(ServiceState::Idle);
             return ProcessResult::Stopped;
         }
+    }
+
+    if (service_state.exchange(ServiceState::Idle) == ServiceState::CancelRequested) {
+        log_line("Cancel triggered on cashier " + std::to_string(id) + " for client " +
+                 std::to_string(client.get_id()) + ". Putting back to queue.");
+
+        {
+            std::lock_guard<std::mutex> lock(queue_mutex);
+            queue.push_front(client);
+        }
+
+        return ProcessResult::Cancelled;
     }
 
     log_line("Cashier " + std::to_string(id) + " finished serving client " + std::to_string(client.get_id()) + ".");

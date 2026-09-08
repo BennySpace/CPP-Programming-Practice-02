@@ -200,8 +200,12 @@ void GameManager::handle_command(const std::string& line) {
             for (auto& cashier : cashiers) {
                 if (cashier->get_id() == cashier_id) {
                     found = true;
-                    cashier->request_cancel();
-                    log_line("Cancel command sent to cashier " + std::to_string(cashier_id) + ".");
+
+                    if (cashier->request_cancel()) {
+                        log_line("Cancel command sent to cashier " + std::to_string(cashier_id) + ".");
+                    } else {
+                        log_line("Cashier " + std::to_string(cashier_id) + " has no current client.");
+                    }
 
                     break;
                 }
