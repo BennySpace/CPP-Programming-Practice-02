@@ -64,22 +64,18 @@ GameManager::GameManager() : served(0), total_clients(0), gen(std::random_device
     std::uniform_int_distribution<int> dist_cashiers(1, 5);
     std::uniform_int_distribution<int> dist_items(1, 15);
 
-    num_clients = get_input_int("Enter number of clients (5-15) or 0 for random: ", 0, 15);
+    num_clients = get_input_int("Enter number of clients (5-15) or 0 for random: ", 5, 15);
 
     if (num_clients == 0) {
         num_clients = dist_clients(gen);
-    } else if (num_clients < 5) {
-        num_clients = 5;
     }
 
     log_line("Number of clients: " + std::to_string(num_clients));
 
-    num_cashiers = get_input_int("Enter number of cashiers (1-5) or 0 for random: ", 0, 5);
+    num_cashiers = get_input_int("Enter number of cashiers (1-5) or 0 for random: ", 1, 5);
 
     if (num_cashiers == 0) {
         num_cashiers = dist_cashiers(gen);
-    } else if (num_cashiers < 1) {
-        num_cashiers = 1;
     }
 
     log_line("Number of cashiers: " + std::to_string(num_cashiers));
@@ -151,7 +147,7 @@ int GameManager::get_input_int(const std::string& prompt, int min_val, int max_v
     int value;
     std::cout << prompt;
 
-    while (!(std::cin >> value) || value < min_val || value > max_val) {
+    while (!(std::cin >> value) || (value != 0 && (value < min_val || value > max_val))) {
         std::cin.clear();
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
         std::cout << "Invalid input. Please enter a number between " << min_val << " and " << max_val << " (or 0 for random): ";
