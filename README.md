@@ -28,9 +28,9 @@ The queue is implemented as a custom doubly linked list. The container itself is
    cmake ..
    cmake --build .
    ```
-5. Run the executable. For example, with the provided Visual Studio CMake profile the binary is created in `out/build/x64-Debug/`:
+5. Run the executable:
    ```bash
-   ./out/build/x64-Debug/ShopQueue
+   ./ShopQueue
    ```
 
 ## Usage
