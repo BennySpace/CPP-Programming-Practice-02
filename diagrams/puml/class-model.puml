@@ -1,0 +1,83 @@
+@startuml
+title Диаграмма классов
+
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+hide empty members
+
+class Client {
+  - id : int
+  - items : int
+  + Client(client_id : int, num_items : int)
+  + get_id() : int
+  + get_items() : int
+}
+
+class DoublyLinkedList {
+  - head : Node*
+  - tail : Node*
+  - list_size : size_t
+  + push_back(c : Client) : void
+  + push_front(c : Client) : void
+  + pop_front() : Client
+  + empty() : bool
+  + size() : size_t
+}
+
+class "DoublyLinkedList::Node" as Node {
+  - data : Client
+  - prev : Node*
+  - next : Node*
+}
+
+class Cashier {
+  - id : int
+  - service_state : atomic<ServiceState>
+  - stop_flag : atomic<bool>
+  + get_id() : int
+  + is_stop_requested() : bool
+  + request_cancel() : bool
+  + request_stop() : void
+  + process(client, queue, queue_mutex) : ProcessResult
+}
+
+enum "Cashier::ProcessResult" as ProcessResult {
+  Completed
+  Cancelled
+  Stopped
+}
+
+enum "Cashier::ServiceState" as ServiceState {
+  Idle
+  Serving
+  CancelRequested
+}
+
+class GameManager {
+  - num_clients : int
+  - num_cashiers : int
+  - queue : DoublyLinkedList
+  - queue_mutex : mutex
+  - served : atomic<int>
+  - total_clients : atomic<int>
+  - cashiers : vector<shared_ptr<Cashier>>
+  - threads : vector<thread>
+  + run() : void
+  - handle_command(line : string) : void
+  - initialize_clients() : void
+  - initialize_cashiers() : void
+}
+
+class "cashier_thread_func(...)" as Worker <<function>>
+
+GameManager *-- DoublyLinkedList : queue
+GameManager o-- "1..*" Cashier : cashiers
+GameManager o-- "1..*" Worker : threads run
+DoublyLinkedList *-- "0..*" Node
+Node *-- Client : data
+Cashier ..> DoublyLinkedList : извлекает / возвращает клиента
+Cashier ..> ProcessResult
+Cashier ..> ServiceState
+Worker ..> Cashier
+Worker ..> DoublyLinkedList
+@enduml

@@ -1,0 +1,43 @@
+@startuml
+title Sequence-диаграмма обслуживания клиента
+
+actor Пользователь as User
+participant "GameManager\n(главный поток)" as Manager
+participant "queue_mutex" as Mutex
+participant "DoublyLinkedList\nочередь" as Queue
+participant "Cashier\n(рабочий поток)" as Cashier
+
+loop Пока остановка не запрошена
+  Cashier -> Mutex : lock()
+  Cashier -> Queue : empty()
+  alt Очередь не пуста
+    Cashier -> Queue : pop_front()
+    Queue --> Cashier : Client
+    Cashier -> Mutex : unlock()
+  else Очередь пуста
+    Cashier -> Mutex : unlock()
+    Cashier -> Cashier : sleep(100 мс)
+  end
+
+  opt Получен Client
+    Cashier -> Cashier : service_state = Serving
+    Cashier -> Cashier : имитировать обслуживание
+    par Обработка команды в главном потоке
+      User -> Manager : galya <id> / obed <id>
+      Manager -> Cashier : request_cancel() / request_stop()
+    else Периодическая проверка в рабочем потоке
+      Cashier -> Cashier : проверить CancelRequested / stop_flag
+    end
+
+    alt Отмена или остановка
+      Cashier -> Mutex : lock()
+      Cashier -> Queue : push_front(Client)
+      Cashier -> Mutex : unlock()
+      Cashier -> Cashier : service_state = Idle
+    else Обслуживание завершено
+      Cashier -> Cashier : service_state = Idle
+      Cashier -> Manager : served.fetch_add(1)
+    end
+  end
+end
+@enduml
